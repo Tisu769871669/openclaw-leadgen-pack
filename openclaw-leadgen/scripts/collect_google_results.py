@@ -189,53 +189,65 @@ def main() -> None:
     if args.browser_profile:
         browser_prefix.extend(["--browser-profile", args.browser_profile])
 
+    print(f"Starting OpenClaw browser for {len(queries)} queries...", flush=True)
     run_command([*browser_prefix, "start"], check=True)
 
     rows: list[dict] = []
     opened_targets: list[str] = []
 
-    for query in queries:
-        search_url = (
-            "https://www.google.com/search?"
-            f"hl={args.hl}&gl={args.gl}&num={args.max_results_per_query}&q={quote_plus(query)}"
-        )
-        tab = browser_json(browser_prefix, ["open", search_url])
-        target_id = ""
-        if isinstance(tab, dict):
-            target_id = str(tab.get("targetId") or tab.get("id") or "").strip()
-        if not target_id:
-            raise RuntimeError(f"could not resolve target id for query: {query}")
-        opened_targets.append(target_id)
+    try:
+        for index, query in enumerate(queries, start=1):
+            print(f"[{index}/{len(queries)}] Google search: {query}", flush=True)
+            target_id = ""
+            try:
+                search_url = (
+                    "https://www.google.com/search?"
+                    f"hl={args.hl}&gl={args.gl}&num={args.max_results_per_query}&q={quote_plus(query)}"
+                )
+                tab = browser_json(browser_prefix, ["open", search_url])
+                if isinstance(tab, dict):
+                    target_id = str(tab.get("targetId") or tab.get("id") or "").strip()
+                if not target_id:
+                    raise RuntimeError(f"could not resolve target id for query: {query}")
+                opened_targets.append(target_id)
 
-        browser_run(browser_prefix, ["wait", "--target-id", target_id, "--load", "domcontentloaded", "--timeout-ms", str(args.timeout_ms)], check=False)
-        browser_run(browser_prefix, ["wait", "--target-id", target_id, "--time", "2500"], check=False)
-        maybe_accept_google_consent(browser_prefix, target_id)
-        browser_run(browser_prefix, ["wait", "--target-id", target_id, "--time", "1500"], check=False)
+                browser_run(browser_prefix, ["wait", "--target-id", target_id, "--load", "domcontentloaded", "--timeout-ms", str(args.timeout_ms)], check=False)
+                browser_run(browser_prefix, ["wait", "--target-id", target_id, "--time", "2500"], check=False)
+                maybe_accept_google_consent(browser_prefix, target_id)
+                browser_run(browser_prefix, ["wait", "--target-id", target_id, "--time", "1500"], check=False)
 
-        result = extract_results(browser_prefix, target_id)
-        extracted = list(result.get("results") or [])[: args.max_results_per_query]
-        if not extracted:
-            dump_html(browser_prefix, target_id, debug_html_dir / f"{sanitize_filename(query)}.html")
+                result = extract_results(browser_prefix, target_id)
+                extracted = list(result.get("results") or [])[: args.max_results_per_query]
+                if not extracted:
+                    dump_html(browser_prefix, target_id, debug_html_dir / f"{sanitize_filename(query)}.html")
+                    print("  -> 0 results, dumped debug HTML", flush=True)
+                else:
+                    print(f"  -> {len(extracted)} results", flush=True)
 
-        for item in extracted:
-            rows.append(
-                {
-                    "query": query,
-                    "title": str(item.get("title") or "").strip(),
-                    "url": str(item.get("url") or "").strip(),
-                    "snippet": str(item.get("snippet") or "").strip(),
-                    "source": "google",
-                    "position": item.get("position"),
-                    "page_title": result.get("pageTitle") or "",
-                }
-            )
+                for item in extracted:
+                    rows.append(
+                        {
+                            "query": query,
+                            "title": str(item.get("title") or "").strip(),
+                            "url": str(item.get("url") or "").strip(),
+                            "snippet": str(item.get("snippet") or "").strip(),
+                            "source": "google",
+                            "position": item.get("position"),
+                            "page_title": result.get("pageTitle") or "",
+                        }
+                    )
+            except Exception as err:
+                print(f"  -> failed: {err}", file=sys.stderr, flush=True)
+                if target_id:
+                    dump_html(browser_prefix, target_id, debug_html_dir / f"{sanitize_filename(query)}.html")
+                continue
 
-    with output_file.open("w", encoding="utf-8") as handle:
-        for row in rows:
-            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-
-    for target_id in opened_targets:
-        run_command([*browser_prefix, "close", target_id], check=False)
+        with output_file.open("w", encoding="utf-8") as handle:
+            for row in rows:
+                handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    finally:
+        for target_id in opened_targets:
+            run_command([*browser_prefix, "close", target_id], check=False)
 
     print(f"OK queries={len(queries)} rows={len(rows)}")
     print(f"OUTPUT {output_file}")

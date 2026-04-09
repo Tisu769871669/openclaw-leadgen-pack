@@ -46,6 +46,7 @@ def main() -> None:
     parser.add_argument("--collector-session-id", default="leadgen-collector")
     parser.add_argument("--collector-thinking", default="medium")
     parser.add_argument("--collector-timeout-seconds", type=int)
+    parser.add_argument("--collector-search-engine", default="bing")
     parser.add_argument("--search-language", default="en-US")
     parser.add_argument("--search-country", default="us")
     parser.add_argument("--search-timeout-ms", type=int, default=20000)
@@ -61,7 +62,7 @@ def main() -> None:
     legacy_input = workspace_root / "input" / "google_results.jsonl"
     if args.input_file:
         input_file = Path(args.input_file).resolve()
-    elif default_input.exists() or args.collect_bing or args.collect_google:
+    elif default_input.exists() or args.collect_via_agent or args.collect_bing or args.collect_google:
         input_file = default_input
     else:
         input_file = legacy_input
@@ -90,11 +91,16 @@ def main() -> None:
             "--max-queries",
             str(args.max_queries),
             "--search-engine",
-            "bing",
+            args.collector_search_engine,
         ]
         if args.collector_timeout_seconds is not None:
             collect_command.extend(["--agent-timeout-seconds", str(args.collector_timeout_seconds)])
-        run_step(collect_command)
+        try:
+            run_step(collect_command)
+        except subprocess.CalledProcessError as err:
+            raise SystemExit(
+                "subagent collection failed; check the JSON error above and any debug artifacts in the workspace out/ directory"
+            ) from err
     elif args.collect_bing or args.collect_google:
         if args.collect_google and not args.collect_bing:
             print("WARN --collect-google is deprecated; using Bing collector instead.")

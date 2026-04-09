@@ -67,6 +67,12 @@ python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-
 python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-root ~/.openclaw/workspace-leadgen --collect-via-agent
 ```
 
+You can override the subagent search engine explicitly:
+
+```bash
+python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-root ~/.openclaw/workspace-leadgen --collect-via-agent --collector-search-engine google
+```
+
 4. If you already have raw search results, save them to `input/search_results.jsonl` inside the leadgen agent workspace and run:
 
 ```bash

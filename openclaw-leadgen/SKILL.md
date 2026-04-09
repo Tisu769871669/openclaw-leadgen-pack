@@ -38,6 +38,12 @@ If you want the `leadgen` subagent to do the searching itself and only hand back
 python scripts/run_pipeline.py --workspace-root <agent-workspace> --collect-via-agent
 ```
 
+You can choose the subagent search engine explicitly:
+
+```bash
+python scripts/run_pipeline.py --workspace-root <agent-workspace> --collect-via-agent --collector-search-engine google
+```
+
 If you need to inject your own search results, each JSONL row should contain:
 
 ```json

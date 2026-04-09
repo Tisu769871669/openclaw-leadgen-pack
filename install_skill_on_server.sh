@@ -25,14 +25,15 @@ if [ -d "$OPENCLAW_HOME/workspace/skills/tavily-search" ]; then
 fi
 
 if command -v openclaw >/dev/null 2>&1; then
-  if openclaw agents list --json | python3 - "$AGENT_NAME" <<'PY'
+  AGENTS_JSON="$(openclaw agents list --json)"
+  if printf '%s' "$AGENTS_JSON" | python3 -c '
 import json
 import sys
 
 target = sys.argv[1]
 agents = json.load(sys.stdin)
 sys.exit(0 if any(agent.get("id") == target for agent in agents) else 1)
-PY
+' "$AGENT_NAME"
   then
     echo "Agent already exists: $AGENT_NAME"
   else

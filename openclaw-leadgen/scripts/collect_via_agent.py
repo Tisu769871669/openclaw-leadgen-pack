@@ -6,6 +6,16 @@ import sys
 from pathlib import Path
 
 
+def read_lines(path: Path) -> list[str]:
+    rows: list[str] = []
+    with path.open("r", encoding="utf-8-sig") as handle:
+        for raw in handle:
+            line = raw.strip()
+            if line and not line.startswith("#"):
+                rows.append(line)
+    return rows
+
+
 def parse_json_output(stdout: str) -> object:
     text = stdout.strip()
     if not text:
@@ -98,29 +108,65 @@ def parse_reply_json(reply_text: str) -> dict:
 
 def build_prompt(
     workspace_root: Path,
-    queries_file: Path,
+    query: str,
     input_file: Path,
-    max_queries: int,
     search_engine: str,
+    query_index: int,
+    query_total: int,
+    results_per_query: int,
 ) -> str:
     return (
         "你是 leadgen 数据采集 subagent。\n"
         f"工作区: {workspace_root}\n"
-        f"查询词文件: {queries_file}\n"
+        f"当前 query: {query}\n"
         f"输出文件: {input_file}\n"
-        f"搜索引擎: {search_engine}\n"
-        f"仅处理前 {max_queries} 条 query。\n\n"
+        f"搜索目标: {search_engine}\n"
+        f"这是第 {query_index}/{query_total} 条 query。\n\n"
         "要求:\n"
-        "1. 使用本机 OpenClaw 浏览器和本地 Chrome 进行网页搜索。\n"
-        "2. 像真人一样从搜索引擎首页进入，在同一个浏览器会话里逐条搜索，不要直接机械批量拼接搜索结果 URL。\n"
-        "3. 把原始搜索结果写入输出文件，每行一个 JSON 对象。\n"
-        "4. 每个 JSON 对象字段必须是: query,title,url,snippet,source,position。\n"
-        f"5. source 固定写 {search_engine}。\n"
-        "6. 如果遇到验证码、block、sorry 页面或无法继续，立即停止，不要继续重试。\n"
-        "7. 不要输出任何解释、Markdown 或多余文本。\n"
-        '8. 成功时只返回 JSON，例如: {"ok":true,"rows":12,"file":"/abs/path/search_results.jsonl","engine":"bing"}。\n'
-        '9. 失败时只返回 JSON，例如: {"ok":false,"blocked":true,"engine":"bing","reason":"captcha_or_block","file":"/abs/path/search_results.jsonl"}。\n'
+        "1. 必须使用当前环境里的 `browser` 工具执行真实浏览器搜索。\n"
+        "2. 不要优先使用 `web_search` 或 `web_fetch`，也不要直接批量抓网页。\n"
+        "3. 在同一个浏览器会话里像真人一样搜索：先打开搜索引擎首页，再输入当前 query，再提交搜索。\n"
+        "4. 只处理这一条 query，不要自行扩展到别的 query。\n"
+        f"5. 采集最多 {results_per_query} 条有用的自然搜索结果。\n"
+        "6. 把结果追加写入输出文件。若文件不存在就创建；若已存在就保留已有行并追加当前 query 的新行。\n"
+        "7. 避免重复写入同一个 query/url 组合。\n"
+        "8. 每行一个 JSON 对象，字段必须是: query,title,url,snippet,source,position。\n"
+        f"9. source 固定写 {search_engine}。\n"
+        "10. 如果遇到验证码、block、sorry 页面或无法继续，立即停止当前任务，不要继续重试。\n"
+        "11. 不要输出解释、Markdown、代码块或多余文本。\n"
+        '12. 成功时只返回 JSON，例如: {"ok":true,"query":"...","rows_added":8,"file":"/abs/path/search_results.jsonl","engine":"google","tool":"browser"}。\n'
+        '13. 失败时只返回 JSON，例如: {"ok":false,"query":"...","blocked":true,"engine":"google","tool":"browser","reason":"captcha_or_block","file":"/abs/path/search_results.jsonl"}。\n'
     )
+
+
+def run_agent_turn(
+    *,
+    openclaw_bin: str,
+    agent_id: str,
+    session_id: str,
+    thinking: str,
+    prompt: str,
+    timeout_seconds: int | None,
+) -> dict:
+    command = [
+        openclaw_bin,
+        "agent",
+        "--agent",
+        agent_id,
+        "--session-id",
+        session_id,
+        "--thinking",
+        thinking,
+        "--json",
+        "--message",
+        prompt,
+    ]
+    if timeout_seconds is not None:
+        command.extend(["--timeout", str(timeout_seconds)])
+
+    payload = run_command(command, expect_json=True)
+    reply_text = extract_reply(payload)
+    return parse_reply_json(reply_text)
 
 
 def main() -> None:
@@ -133,8 +179,10 @@ def main() -> None:
     parser.add_argument("--session-id", default="leadgen-collector")
     parser.add_argument("--thinking", default="medium")
     parser.add_argument("--max-queries", type=int, default=20)
-    parser.add_argument("--search-engine", default="bing")
+    parser.add_argument("--results-per-query", type=int, default=10)
+    parser.add_argument("--search-engine", default="google")
     parser.add_argument("--agent-timeout-seconds", type=int)
+    parser.add_argument("--append-existing", action="store_true")
     args = parser.parse_args()
 
     workspace_root = Path(args.workspace_root).resolve()
@@ -142,42 +190,55 @@ def main() -> None:
     input_file = Path(args.input_file).resolve()
     input_file.parent.mkdir(parents=True, exist_ok=True)
 
-    prompt = build_prompt(
-        workspace_root=workspace_root,
-        queries_file=queries_file,
-        input_file=input_file,
-        max_queries=args.max_queries,
-        search_engine=args.search_engine,
-    )
+    queries = read_lines(queries_file)[: args.max_queries]
+    if not args.append_existing and input_file.exists():
+        input_file.unlink()
 
-    command = [
-        args.openclaw_bin,
-        "agent",
-        "--agent",
-        args.agent_id,
-        "--session-id",
-        args.session_id,
-        "--thinking",
-        args.thinking,
-        "--json",
-        "--message",
-        prompt,
-    ]
-    if args.agent_timeout_seconds is not None:
-        command.extend(["--timeout", str(args.agent_timeout_seconds)])
+    total_rows_added = 0
+    processed_queries = 0
 
-    payload = run_command(command, expect_json=True)
-    reply_text = extract_reply(payload)
-    result = parse_reply_json(reply_text)
+    for index, query in enumerate(queries, start=1):
+        prompt = build_prompt(
+            workspace_root=workspace_root,
+            query=query,
+            input_file=input_file,
+            search_engine=args.search_engine,
+            query_index=index,
+            query_total=len(queries),
+            results_per_query=args.results_per_query,
+        )
+        result = run_agent_turn(
+            openclaw_bin=args.openclaw_bin,
+            agent_id=args.agent_id,
+            session_id=args.session_id,
+            thinking=args.thinking,
+            prompt=prompt,
+            timeout_seconds=args.agent_timeout_seconds,
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
 
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+        if not result.get("ok"):
+            reason = result.get("reason") or "subagent collection failed"
+            raise SystemExit(f"subagent collection failed at query {index}: {reason}")
 
-    if not result.get("ok"):
-        reason = result.get("reason") or "subagent collection failed"
-        raise SystemExit(f"subagent collection failed: {reason}")
+        processed_queries += 1
+        try:
+            total_rows_added += int(result.get("rows_added", 0) or 0)
+        except Exception:
+            pass
 
     if not input_file.exists():
         raise SystemExit(f"subagent reported success but output file is missing: {input_file}")
+
+    summary = {
+        "ok": True,
+        "processed_queries": processed_queries,
+        "rows_added": total_rows_added,
+        "file": str(input_file),
+        "engine": args.search_engine,
+        "tool": "browser",
+    }
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

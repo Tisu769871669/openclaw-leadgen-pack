@@ -67,6 +67,8 @@ python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-
 python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-root ~/.openclaw/workspace-leadgen --collect-via-agent
 ```
 
+`--collect-via-agent` sends one query at a time to the `leadgen` subagent and asks it to use the OpenClaw `browser` tool in a more human-like session flow.
+
 You can override the subagent search engine explicitly:
 
 ```bash

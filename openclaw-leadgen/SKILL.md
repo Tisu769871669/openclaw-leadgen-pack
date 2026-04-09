@@ -38,6 +38,8 @@ If you want the `leadgen` subagent to do the searching itself and only hand back
 python scripts/run_pipeline.py --workspace-root <agent-workspace> --collect-via-agent
 ```
 
+The subagent path should work one query at a time and prefer the OpenClaw `browser` tool so the search flow looks closer to a human browsing session.
+
 You can choose the subagent search engine explicitly:
 
 ```bash

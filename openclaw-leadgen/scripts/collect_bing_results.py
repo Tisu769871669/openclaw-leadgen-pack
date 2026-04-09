@@ -65,6 +65,7 @@ EXTRACT_RESULTS_JS = """
 
 
 HTML_DUMP_JS = "() => document.documentElement.outerHTML"
+SEARCH_INPUT_READY_SELECTOR = "#sb_form_q, input[name='q'], textarea[name='q'], input[type='search'], textarea[type='search']"
 PAGE_META_JS = """
 () => ({
   url: location.href,
@@ -173,6 +174,41 @@ def dump_html(browser_prefix: list[str], target_id: str, path: Path) -> None:
         path.write_text(result, encoding="utf-8")
 
 
+def build_submit_search_js(query: str) -> str:
+    query_json = json.dumps(query, ensure_ascii=False)
+    return f"""
+() => {{
+  const query = {query_json};
+  const input = document.querySelector("{SEARCH_INPUT_READY_SELECTOR}");
+  if (!input) {{
+    return {{ submitted: false, reason: "input-not-found" }};
+  }}
+  input.focus();
+  if ("value" in input) {{
+    input.value = "";
+    input.dispatchEvent(new Event("input", {{ bubbles: true }}));
+    input.value = query;
+    input.dispatchEvent(new Event("input", {{ bubbles: true }}));
+    input.dispatchEvent(new Event("change", {{ bubbles: true }}));
+  }}
+  const button = document.querySelector("#sb_form_go, button[type='submit'], input[type='submit']");
+  if (button) {{
+    button.click();
+    return {{ submitted: true, method: "button-click" }};
+  }}
+  const form = input.form || input.closest("form");
+  if (form) {{
+    form.submit();
+    return {{ submitted: true, method: "form-submit" }};
+  }}
+  input.dispatchEvent(new KeyboardEvent("keydown", {{ key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }}));
+  input.dispatchEvent(new KeyboardEvent("keypress", {{ key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }}));
+  input.dispatchEvent(new KeyboardEvent("keyup", {{ key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }}));
+  return {{ submitted: true, method: "enter-key" }};
+}}
+""".strip()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--workspace-root", required=True)
@@ -205,64 +241,71 @@ def main() -> None:
     run_command([*browser_prefix, "start"], check=True)
 
     rows: list[dict] = []
+    target_id = ""
+    homepage_url = f"https://www.bing.com/?setlang={quote_plus(args.setlang)}&cc={quote_plus(args.cc)}"
 
-    for index, query in enumerate(queries, start=1):
-        print(f"[{index}/{len(queries)}] Bing search: {query}", flush=True)
-        target_id = ""
-        try:
-            search_url = (
-                "https://www.bing.com/search?"
-                f"setlang={args.setlang}&cc={args.cc}&count={args.max_results_per_query}&q={quote_plus(query)}"
-            )
-            tab = browser_json(browser_prefix, ["open", search_url])
-            if isinstance(tab, dict):
-                target_id = str(tab.get("targetId") or tab.get("id") or "").strip()
-            if not target_id:
-                raise RuntimeError(f"could not resolve target id for query: {query}")
+    try:
+        tab = browser_json(browser_prefix, ["open", homepage_url])
+        if isinstance(tab, dict):
+            target_id = str(tab.get("targetId") or tab.get("id") or "").strip()
+        if not target_id:
+            raise RuntimeError("could not resolve Bing tab target id")
 
-            browser_run(browser_prefix, ["wait", "--target-id", target_id, "--load", "domcontentloaded", "--timeout-ms", str(args.timeout_ms)], check=False)
-            browser_run(browser_prefix, ["wait", "#b_results", "--target-id", target_id, "--timeout-ms", str(args.timeout_ms)], check=False)
-            browser_run(browser_prefix, ["wait", "--target-id", target_id, "--time", "1500"], check=False)
-            maybe_accept_consent(browser_prefix, target_id)
-            browser_run(browser_prefix, ["wait", "--target-id", target_id, "--time", "1000"], check=False)
+        for index, query in enumerate(queries, start=1):
+            print(f"[{index}/{len(queries)}] Bing search: {query}", flush=True)
+            try:
+                browser_run(browser_prefix, ["navigate", "--target-id", target_id, homepage_url], check=False)
+                browser_run(browser_prefix, ["wait", "--target-id", target_id, "--load", "domcontentloaded", "--timeout-ms", str(args.timeout_ms)], check=False)
+                browser_run(browser_prefix, ["wait", SEARCH_INPUT_READY_SELECTOR, "--target-id", target_id, "--timeout-ms", str(args.timeout_ms)], check=False)
+                browser_run(browser_prefix, ["wait", "--target-id", target_id, "--time", "1200"], check=False)
+                maybe_accept_consent(browser_prefix, target_id)
+                browser_run(browser_prefix, ["wait", "--target-id", target_id, "--time", "800"], check=False)
 
-            page_meta = fetch_page_meta(browser_prefix, target_id)
-            if is_bing_block_page(page_meta):
-                dump_path = debug_html_dir / f"{sanitize_filename(query)}.html"
-                dump_html(browser_prefix, target_id, dump_path)
-                raise RuntimeError(
-                    "bing returned a block or verification page; "
-                    f"debug HTML saved to {dump_path}"
-                )
+                submit_payload = browser_json(browser_prefix, ["evaluate", "--target-id", target_id, "--fn", build_submit_search_js(query)])
+                submit_result = submit_payload.get("result") if isinstance(submit_payload, dict) else None
+                if isinstance(submit_result, dict) and not submit_result.get("submitted"):
+                    raise RuntimeError(f"could not submit Bing search: {submit_result}")
 
-            result = extract_results(browser_prefix, target_id)
-            extracted = list(result.get("results") or [])[: args.max_results_per_query]
-            if not extracted:
+                browser_run(browser_prefix, ["wait", "--target-id", target_id, "--load", "domcontentloaded", "--timeout-ms", str(args.timeout_ms)], check=False)
+                browser_run(browser_prefix, ["wait", "#b_results", "--target-id", target_id, "--timeout-ms", str(args.timeout_ms)], check=False)
+                browser_run(browser_prefix, ["wait", "--target-id", target_id, "--time", "1500"], check=False)
+
+                page_meta = fetch_page_meta(browser_prefix, target_id)
+                if is_bing_block_page(page_meta):
+                    dump_path = debug_html_dir / f"{sanitize_filename(query)}.html"
+                    dump_html(browser_prefix, target_id, dump_path)
+                    raise RuntimeError(
+                        "bing returned a block or verification page; "
+                        f"debug HTML saved to {dump_path}"
+                    )
+
+                result = extract_results(browser_prefix, target_id)
+                extracted = list(result.get("results") or [])[: args.max_results_per_query]
+                if not extracted:
+                    dump_html(browser_prefix, target_id, debug_html_dir / f"{sanitize_filename(query)}.html")
+                    print("  -> 0 results, dumped debug HTML", flush=True)
+                else:
+                    print(f"  -> {len(extracted)} results", flush=True)
+
+                for item in extracted:
+                    rows.append(
+                        {
+                            "query": query,
+                            "title": str(item.get("title") or "").strip(),
+                            "url": str(item.get("url") or "").strip(),
+                            "snippet": str(item.get("snippet") or "").strip(),
+                            "source": "bing",
+                            "position": item.get("position"),
+                            "page_title": result.get("pageTitle") or "",
+                        }
+                    )
+            except Exception as err:
+                print(f"  -> failed: {err}", file=sys.stderr, flush=True)
                 dump_html(browser_prefix, target_id, debug_html_dir / f"{sanitize_filename(query)}.html")
-                print("  -> 0 results, dumped debug HTML", flush=True)
-            else:
-                print(f"  -> {len(extracted)} results", flush=True)
-
-            for item in extracted:
-                rows.append(
-                    {
-                        "query": query,
-                        "title": str(item.get("title") or "").strip(),
-                        "url": str(item.get("url") or "").strip(),
-                        "snippet": str(item.get("snippet") or "").strip(),
-                        "source": "bing",
-                        "position": item.get("position"),
-                        "page_title": result.get("pageTitle") or "",
-                    }
-                )
-        except Exception as err:
-            print(f"  -> failed: {err}", file=sys.stderr, flush=True)
-            if target_id:
-                dump_html(browser_prefix, target_id, debug_html_dir / f"{sanitize_filename(query)}.html")
-            break
-        finally:
-            if target_id:
-                run_command([*browser_prefix, "close", target_id], check=False)
+                break
+    finally:
+        if target_id:
+            run_command([*browser_prefix, "close", target_id], check=False)
 
     with output_file.open("w", encoding="utf-8") as handle:
         for row in rows:

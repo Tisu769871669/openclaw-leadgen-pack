@@ -1,4 +1,4 @@
 interface:
   display_name: "OpenClaw Leadgen"
-  short_description: "Rank Google results into reseller leads"
-  default_prompt: "Turn local Google search results into scored, non-official dealer leads and export a contact-ready Top20."
+  short_description: "Rank Bing results into reseller leads"
+  default_prompt: "Turn local Bing search results into scored, non-official dealer leads and export a contact-ready Top20."

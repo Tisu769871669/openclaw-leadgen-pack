@@ -18,18 +18,18 @@ python scripts/bootstrap_workspace.py --workspace-root <agent-workspace>
 
 This creates `config/`, `input/`, and `out/`, then copies the default query and filter files into `config/`.
 
-3. Collect local Google search results into `input/google_results.jsonl`.
+3. Collect local Bing search results into `input/search_results.jsonl`.
 
 Prefer the bundled collector:
 
 ```bash
-python scripts/collect_google_results.py --workspace-root <agent-workspace>
+python scripts/collect_bing_results.py --workspace-root <agent-workspace>
 ```
 
 Or run the full pipeline in one step:
 
 ```bash
-python scripts/run_pipeline.py --workspace-root <agent-workspace> --collect-google
+python scripts/run_pipeline.py --workspace-root <agent-workspace> --collect-bing
 ```
 
 If you need to inject your own search results, each JSONL row should contain:
@@ -40,7 +40,7 @@ If you need to inject your own search results, each JSONL row should contain:
 
 Required keys are `query`, `title`, `url`, and `snippet`. Optional keys are `source`, `position`, and `collected_at`.
 
-When Chrome is available on the target machine, prefer browser automation against Google over any Tavily-based skill or MCP.
+When Chrome is available on the target machine, prefer browser automation against Bing over Tavily-based search.
 
 4. Run the pipeline:
 
@@ -59,8 +59,8 @@ python scripts/run_pipeline.py --workspace-root <agent-workspace>
 
 - Use the seeded searches from `config/queries.txt` unless the user asks for a different market.
 - Prefer the local browser path on the machine that runs the agent. Use Tavily only if the user explicitly asks for it.
-- Prefer organic Google results. Do not include forums, social feeds, or marketplaces unless the user explicitly wants them.
-- Preserve the Google snippet as `snippet`. Do not fetch or scrape full pages before ranking unless the user asks for deeper enrichment.
+- Prefer organic Bing results. Do not include forums, social feeds, or marketplaces unless the user explicitly wants them.
+- Preserve the search snippet as `snippet`. Do not fetch or scrape full pages before ranking unless the user asks for deeper enrichment.
 - Keep one row per search result. Do not merge results from multiple queries before writing JSONL.
 - When you adjust targeting, edit the workspace copy in `config/`, not the bundled assets, unless you are intentionally changing the defaults for every future run.
 
@@ -74,9 +74,9 @@ Create the standard workspace folders and copy default query/filter assets into 
 
 Score and filter raw Google/browser search results into lead candidates. This is the replacement for the old Tavily collector.
 
-### `scripts/collect_google_results.py`
+### `scripts/collect_bing_results.py`
 
-Use the local OpenClaw browser and Chrome to run Google searches from `config/queries.txt`, then write normalized raw results to `input/google_results.jsonl`.
+Use the local OpenClaw browser and Chrome to run Bing searches from `config/queries.txt`, then write normalized raw results to `input/search_results.jsonl`.
 
 ### `scripts/postprocess_contact_top20.py`
 

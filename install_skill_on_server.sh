@@ -17,7 +17,7 @@ python3 "$SKILL_DST/scripts/bootstrap_workspace.py" --workspace-root "$WORKSPACE
 
 if [ -x /usr/bin/google-chrome ]; then
   echo "Detected Chrome: $(/usr/bin/google-chrome --version 2>/dev/null || echo /usr/bin/google-chrome)"
-  echo "Preferred search path: browser automation against Google"
+  echo "Preferred search path: browser automation against Bing"
 fi
 
 if [ -d "$OPENCLAW_HOME/workspace/skills/tavily-search" ]; then

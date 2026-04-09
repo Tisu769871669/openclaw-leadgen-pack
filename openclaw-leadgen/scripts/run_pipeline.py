@@ -37,13 +37,14 @@ def main() -> None:
     parser.add_argument("--input-file")
     parser.add_argument("--config-dir")
     parser.add_argument("--out-dir")
+    parser.add_argument("--collect-bing", action="store_true")
     parser.add_argument("--collect-google", action="store_true")
     parser.add_argument("--openclaw-bin", default="openclaw")
     parser.add_argument("--browser-profile")
-    parser.add_argument("--google-language", default="en")
-    parser.add_argument("--google-country", default="us")
-    parser.add_argument("--google-timeout-ms", type=int, default=20000)
-    parser.add_argument("--google-results-per-query", type=int, default=10)
+    parser.add_argument("--search-language", default="en-US")
+    parser.add_argument("--search-country", default="us")
+    parser.add_argument("--search-timeout-ms", type=int, default=20000)
+    parser.add_argument("--search-results-per-query", type=int, default=10)
     parser.add_argument("--max-queries", type=int, default=25)
     parser.add_argument("--min-score", type=int, default=0)
     parser.add_argument("--top-n", type=int, default=20)
@@ -51,15 +52,24 @@ def main() -> None:
 
     skill_dir = Path(__file__).resolve().parents[1]
     workspace_root = Path(args.workspace_root).resolve()
-    input_file = Path(args.input_file).resolve() if args.input_file else workspace_root / "input" / "google_results.jsonl"
+    default_input = workspace_root / "input" / "search_results.jsonl"
+    legacy_input = workspace_root / "input" / "google_results.jsonl"
+    if args.input_file:
+        input_file = Path(args.input_file).resolve()
+    elif default_input.exists() or args.collect_bing or args.collect_google:
+        input_file = default_input
+    else:
+        input_file = legacy_input
     config_dir = Path(args.config_dir).resolve() if args.config_dir else workspace_root / "config"
     out_dir = Path(args.out_dir).resolve() if args.out_dir else workspace_root / "out"
 
     ensure_workspace(skill_dir, workspace_root, config_dir)
-    if args.collect_google:
+    if args.collect_bing or args.collect_google:
+        if args.collect_google and not args.collect_bing:
+            print("WARN --collect-google is deprecated; using Bing collector instead.")
         collect_command = [
             sys.executable,
-            str(skill_dir / "scripts" / "collect_google_results.py"),
+            str(skill_dir / "scripts" / "collect_bing_results.py"),
             "--workspace-root",
             str(workspace_root),
             "--queries-file",
@@ -68,14 +78,14 @@ def main() -> None:
             str(input_file),
             "--openclaw-bin",
             args.openclaw_bin,
-            "--hl",
-            args.google_language,
-            "--gl",
-            args.google_country,
+            "--setlang",
+            args.search_language,
+            "--cc",
+            args.search_country,
             "--timeout-ms",
-            str(args.google_timeout_ms),
+            str(args.search_timeout_ms),
             "--max-results-per-query",
-            str(args.google_results_per_query),
+            str(args.search_results_per_query),
             "--max-queries",
             str(args.max_queries),
         ]

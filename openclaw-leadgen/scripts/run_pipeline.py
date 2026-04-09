@@ -37,6 +37,13 @@ def main() -> None:
     parser.add_argument("--input-file")
     parser.add_argument("--config-dir")
     parser.add_argument("--out-dir")
+    parser.add_argument("--collect-google", action="store_true")
+    parser.add_argument("--openclaw-bin", default="openclaw")
+    parser.add_argument("--browser-profile")
+    parser.add_argument("--google-language", default="en")
+    parser.add_argument("--google-country", default="us")
+    parser.add_argument("--google-timeout-ms", type=int, default=20000)
+    parser.add_argument("--google-results-per-query", type=int, default=10)
     parser.add_argument("--max-queries", type=int, default=25)
     parser.add_argument("--min-score", type=int, default=0)
     parser.add_argument("--top-n", type=int, default=20)
@@ -49,6 +56,33 @@ def main() -> None:
     out_dir = Path(args.out_dir).resolve() if args.out_dir else workspace_root / "out"
 
     ensure_workspace(skill_dir, workspace_root, config_dir)
+    if args.collect_google:
+        collect_command = [
+            sys.executable,
+            str(skill_dir / "scripts" / "collect_google_results.py"),
+            "--workspace-root",
+            str(workspace_root),
+            "--queries-file",
+            str(config_dir / "queries.txt"),
+            "--output-file",
+            str(input_file),
+            "--openclaw-bin",
+            args.openclaw_bin,
+            "--hl",
+            args.google_language,
+            "--gl",
+            args.google_country,
+            "--timeout-ms",
+            str(args.google_timeout_ms),
+            "--max-results-per-query",
+            str(args.google_results_per_query),
+            "--max-queries",
+            str(args.max_queries),
+        ]
+        if args.browser_profile:
+            collect_command.extend(["--browser-profile", args.browser_profile])
+        run_step(collect_command)
+
     if not input_file.exists():
         raise SystemExit(f"missing input file: {input_file}")
 

@@ -19,7 +19,20 @@ python scripts/bootstrap_workspace.py --workspace-root <agent-workspace>
 This creates `config/`, `input/`, and `out/`, then copies the default query and filter files into `config/`.
 
 3. Collect local Google search results into `input/google_results.jsonl`.
-Each JSONL row should contain:
+
+Prefer the bundled collector:
+
+```bash
+python scripts/collect_google_results.py --workspace-root <agent-workspace>
+```
+
+Or run the full pipeline in one step:
+
+```bash
+python scripts/run_pipeline.py --workspace-root <agent-workspace> --collect-google
+```
+
+If you need to inject your own search results, each JSONL row should contain:
 
 ```json
 {"query":"used rolex in stock shop","title":"Example Dealer","url":"https://example.com","snippet":"Pre-owned Rolex inventory and contact details","source":"google","position":1}
@@ -60,6 +73,10 @@ Create the standard workspace folders and copy default query/filter assets into 
 ### `scripts/filter_search_results.py`
 
 Score and filter raw Google/browser search results into lead candidates. This is the replacement for the old Tavily collector.
+
+### `scripts/collect_google_results.py`
+
+Use the local OpenClaw browser and Chrome to run Google searches from `config/queries.txt`, then write normalized raw results to `input/google_results.jsonl`.
 
 ### `scripts/postprocess_contact_top20.py`
 

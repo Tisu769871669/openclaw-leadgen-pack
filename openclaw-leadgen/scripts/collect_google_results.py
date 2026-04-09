@@ -84,11 +84,18 @@ EXTRACT_RESULTS_JS = """
 
 
 HTML_DUMP_JS = "() => document.documentElement.outerHTML"
+PAGE_META_JS = """
+() => ({
+  url: location.href,
+  title: document.title,
+  text: (document.body?.innerText || '').slice(0, 4000)
+})
+""".strip()
 
 
 def read_lines(path: Path) -> list[str]:
     rows: list[str] = []
-    with path.open("r", encoding="utf-8") as handle:
+    with path.open("r", encoding="utf-8-sig") as handle:
         for raw in handle:
             line = raw.strip()
             if line and not line.startswith("#"):
@@ -160,6 +167,31 @@ def dump_html(browser_prefix: list[str], target_id: str, path: Path) -> None:
         path.write_text(result, encoding="utf-8")
 
 
+def fetch_page_meta(browser_prefix: list[str], target_id: str) -> dict:
+    payload = browser_json(browser_prefix, ["evaluate", "--target-id", target_id, "--fn", PAGE_META_JS])
+    result = payload.get("result") if isinstance(payload, dict) else None
+    if not isinstance(result, dict):
+        return {}
+    return result
+
+
+def is_google_block_page(page_meta: dict) -> bool:
+    url = str(page_meta.get("url") or "").lower()
+    title = str(page_meta.get("title") or "").lower()
+    text = str(page_meta.get("text") or "").lower()
+    if "/sorry/" in url:
+        return True
+    signals = (
+        "unusual traffic",
+        "detected unusual traffic",
+        "our systems have detected",
+        "not a robot",
+        "recaptcha",
+    )
+    haystack = f"{title}\n{text}"
+    return any(signal in haystack for signal in signals)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--workspace-root", required=True)
@@ -216,6 +248,15 @@ def main() -> None:
                 maybe_accept_google_consent(browser_prefix, target_id)
                 browser_run(browser_prefix, ["wait", "--target-id", target_id, "--time", "1500"], check=False)
 
+                page_meta = fetch_page_meta(browser_prefix, target_id)
+                if is_google_block_page(page_meta):
+                    dump_path = debug_html_dir / f"{sanitize_filename(query)}.html"
+                    dump_html(browser_prefix, target_id, dump_path)
+                    raise RuntimeError(
+                        "google returned a sorry/recaptcha page; "
+                        f"debug HTML saved to {dump_path}"
+                    )
+
                 result = extract_results(browser_prefix, target_id)
                 extracted = list(result.get("results") or [])[: args.max_results_per_query]
                 if not extracted:
@@ -240,7 +281,12 @@ def main() -> None:
                 print(f"  -> failed: {err}", file=sys.stderr, flush=True)
                 if target_id:
                     dump_html(browser_prefix, target_id, debug_html_dir / f"{sanitize_filename(query)}.html")
-                continue
+                break
+            finally:
+                if target_id:
+                    run_command([*browser_prefix, "close", target_id], check=False)
+                    if target_id in opened_targets:
+                        opened_targets.remove(target_id)
 
         with output_file.open("w", encoding="utf-8") as handle:
             for row in rows:

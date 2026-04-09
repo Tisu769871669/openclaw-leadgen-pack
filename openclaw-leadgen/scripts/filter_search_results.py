@@ -103,7 +103,7 @@ CONTACT_HINTS = [
 
 def read_lines(path: Path) -> list[str]:
     lines: list[str] = []
-    with path.open("r", encoding="utf-8") as handle:
+    with path.open("r", encoding="utf-8-sig") as handle:
         for line in handle:
             value = line.strip()
             if value and not value.startswith("#"):

@@ -61,13 +61,19 @@ python3 ~/.openclaw/skills/openclaw-leadgen/scripts/collect_bing_results.py --wo
 python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-root ~/.openclaw/workspace-leadgen --collect-bing
 ```
 
-3. If you already have raw search results, save them to `input/search_results.jsonl` inside the leadgen agent workspace and run:
+3. If you want the `leadgen` subagent itself to collect data with the local browser, run:
+
+```bash
+python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-root ~/.openclaw/workspace-leadgen --collect-via-agent
+```
+
+4. If you already have raw search results, save them to `input/search_results.jsonl` inside the leadgen agent workspace and run:
 
 ```bash
 python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-root ~/.openclaw/workspace-leadgen
 ```
 
-4. Review outputs in `out/`:
+5. Review outputs in `out/`:
    - `latest_leads.csv`
    - `latest_leads.jsonl`
    - `latest_summary.md`

@@ -37,10 +37,15 @@ def main() -> None:
     parser.add_argument("--input-file")
     parser.add_argument("--config-dir")
     parser.add_argument("--out-dir")
+    parser.add_argument("--collect-via-agent", action="store_true")
     parser.add_argument("--collect-bing", action="store_true")
     parser.add_argument("--collect-google", action="store_true")
     parser.add_argument("--openclaw-bin", default="openclaw")
     parser.add_argument("--browser-profile")
+    parser.add_argument("--collector-agent-id", default="leadgen")
+    parser.add_argument("--collector-session-id", default="leadgen-collector")
+    parser.add_argument("--collector-thinking", default="medium")
+    parser.add_argument("--collector-timeout-seconds", type=int)
     parser.add_argument("--search-language", default="en-US")
     parser.add_argument("--search-country", default="us")
     parser.add_argument("--search-timeout-ms", type=int, default=20000)
@@ -64,7 +69,33 @@ def main() -> None:
     out_dir = Path(args.out_dir).resolve() if args.out_dir else workspace_root / "out"
 
     ensure_workspace(skill_dir, workspace_root, config_dir)
-    if args.collect_bing or args.collect_google:
+    if args.collect_via_agent:
+        collect_command = [
+            sys.executable,
+            str(skill_dir / "scripts" / "collect_via_agent.py"),
+            "--workspace-root",
+            str(workspace_root),
+            "--queries-file",
+            str(config_dir / "queries.txt"),
+            "--input-file",
+            str(input_file),
+            "--openclaw-bin",
+            args.openclaw_bin,
+            "--agent-id",
+            args.collector_agent_id,
+            "--session-id",
+            args.collector_session_id,
+            "--thinking",
+            args.collector_thinking,
+            "--max-queries",
+            str(args.max_queries),
+            "--search-engine",
+            "bing",
+        ]
+        if args.collector_timeout_seconds is not None:
+            collect_command.extend(["--agent-timeout-seconds", str(args.collector_timeout_seconds)])
+        run_step(collect_command)
+    elif args.collect_bing or args.collect_google:
         if args.collect_google and not args.collect_bing:
             print("WARN --collect-google is deprecated; using Bing collector instead.")
         collect_command = [

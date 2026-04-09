@@ -32,6 +32,12 @@ Or run the full pipeline in one step:
 python scripts/run_pipeline.py --workspace-root <agent-workspace> --collect-bing
 ```
 
+If you want the `leadgen` subagent to do the searching itself and only hand back raw JSONL, run:
+
+```bash
+python scripts/run_pipeline.py --workspace-root <agent-workspace> --collect-via-agent
+```
+
 If you need to inject your own search results, each JSONL row should contain:
 
 ```json
@@ -77,6 +83,10 @@ Score and filter raw Google/browser search results into lead candidates. This is
 ### `scripts/collect_bing_results.py`
 
 Use the local OpenClaw browser and Chrome to run Bing searches from `config/queries.txt`, then write normalized raw results to `input/search_results.jsonl`.
+
+### `scripts/collect_via_agent.py`
+
+Send a collection task to a dedicated subagent such as `leadgen`, wait for it to write `input/search_results.jsonl`, then continue the pipeline locally.
 
 ### `scripts/postprocess_contact_top20.py`
 

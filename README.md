@@ -6,6 +6,7 @@ This directory now contains the refactored leadgen workflow as an OpenClaw skill
 
 - `openclaw-leadgen/`
   - `SKILL.md`: agent instructions for the leadgen workflow
+  - `prompts/leadgen-subagent-browser-prompt.md`: reusable prompt template sent to the `leadgen` subagent
   - `scripts/bootstrap_workspace.py`: create `config/`, `input/`, and `out/`
   - `scripts/collect_bing_results.py`: use OpenClaw browser plus local Chrome to collect Bing results
   - `scripts/filter_search_results.py`: score and filter raw local browser search results

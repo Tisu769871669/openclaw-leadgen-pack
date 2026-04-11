@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+PROMPT_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "prompts" / "leadgen-subagent-browser-prompt.md"
+
 
 def read_lines(path: Path) -> list[str]:
     rows: list[str] = []
@@ -115,28 +117,22 @@ def build_prompt(
     query_total: int,
     results_per_query: int,
 ) -> str:
-    return (
-        "你是 leadgen 数据采集 subagent。\n"
-        f"工作区: {workspace_root}\n"
-        f"当前 query: {query}\n"
-        f"输出文件: {input_file}\n"
-        f"搜索目标: {search_engine}\n"
-        f"这是第 {query_index}/{query_total} 条 query。\n\n"
-        "要求:\n"
-        "1. 必须使用当前环境里的 `browser` 工具执行真实浏览器搜索。\n"
-        "2. 不要优先使用 `web_search` 或 `web_fetch`，也不要直接批量抓网页。\n"
-        "3. 在同一个浏览器会话里像真人一样搜索：先打开搜索引擎首页，再输入当前 query，再提交搜索。\n"
-        "4. 只处理这一条 query，不要自行扩展到别的 query。\n"
-        f"5. 采集最多 {results_per_query} 条有用的自然搜索结果。\n"
-        "6. 把结果追加写入输出文件。若文件不存在就创建；若已存在就保留已有行并追加当前 query 的新行。\n"
-        "7. 避免重复写入同一个 query/url 组合。\n"
-        "8. 每行一个 JSON 对象，字段必须是: query,title,url,snippet,source,position。\n"
-        f"9. source 固定写 {search_engine}。\n"
-        "10. 如果遇到验证码、block、sorry 页面或无法继续，立即停止当前任务，不要继续重试。\n"
-        "11. 不要输出解释、Markdown、代码块或多余文本。\n"
-        '12. 成功时只返回 JSON，例如: {"ok":true,"query":"...","rows_added":8,"file":"/abs/path/search_results.jsonl","engine":"google","tool":"browser"}。\n'
-        '13. 失败时只返回 JSON，例如: {"ok":false,"query":"...","blocked":true,"engine":"google","tool":"browser","reason":"captcha_or_block","file":"/abs/path/search_results.jsonl"}。\n'
-    )
+    template_path = PROMPT_TEMPLATE_PATH
+    if not template_path.exists():
+        raise FileNotFoundError(f"prompt template not found: {template_path}")
+    prompt = template_path.read_text(encoding="utf-8")
+    replacements = {
+        "WORKSPACE_ROOT": str(workspace_root),
+        "QUERY": query,
+        "OUTPUT_FILE": str(input_file),
+        "SEARCH_ENGINE": search_engine,
+        "QUERY_INDEX": str(query_index),
+        "QUERY_TOTAL": str(query_total),
+        "RESULTS_PER_QUERY": str(results_per_query),
+    }
+    for key, value in replacements.items():
+        prompt = prompt.replace(f"{{{{{key}}}}}", value)
+    return prompt
 
 
 def run_agent_turn(

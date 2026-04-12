@@ -9,7 +9,7 @@ This directory now contains the refactored leadgen workflow as an OpenClaw skill
   - `prompts/leadgen-subagent-browser-prompt.md`: reusable prompt template sent to the `leadgen` subagent
   - `prompts/main-agent-auto-leadgen.md`: orchestration prompt used by the `main` agent to control `leadgen`
   - `scripts/bootstrap_workspace.py`: create `config/`, `input/`, and `out/`
-  - `scripts/collect_bing_results.py`: use OpenClaw browser plus local Chrome to collect Bing results
+  - `scripts/collect_bing_results.py`: optional browser collector for Bing fallback
   - `scripts/filter_search_results.py`: score and filter raw local browser search results
   - `scripts/postprocess_contact_top20.py`: contact-signal filter plus root-domain dedup
   - `scripts/run_pipeline.py`: run the pipeline end to end
@@ -18,7 +18,7 @@ This directory now contains the refactored leadgen workflow as an OpenClaw skill
 ## Installation target
 
 - Skill directory: `~/.openclaw/skills/openclaw-leadgen`
-- Suggested dedicated agent workspace: `~/.openclaw/workspace-leadgen`
+- Current validated workspace: `~/.openclaw/workspace/leadgen`
 
 ## Install on an OpenClaw server
 
@@ -38,7 +38,8 @@ The install script:
 
 The Tokyo server already has headless Chrome available at `/usr/bin/google-chrome`.
 
-- Prefer browser-driven Bing collection for this refactor.
+- Prefer `main agent -> leadgen subagent -> browser -> Google` for the production flow.
+- Keep `Bing` only as a fallback collector.
 - Treat `~/.openclaw/workspace/skills/tavily-search` as legacy.
 - Keep Tavily out of the new leadgen skill unless you intentionally want a fallback path.
 
@@ -51,22 +52,28 @@ Optional environment variables:
 
 ## Runtime flow
 
-1. Use the built-in collector to fetch Bing results with the local OpenClaw browser and Chrome:
+1. Preferred production flow: let the `main` agent orchestrate `leadgen`, and let `leadgen` collect with `browser` on Google:
 
 ```bash
-python3 ~/.openclaw/skills/openclaw-leadgen/scripts/collect_bing_results.py --workspace-root ~/.openclaw/workspace-leadgen
+python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-root ~/.openclaw/workspace/leadgen --collect-via-agent --collector-search-engine google
 ```
 
-2. Or run collection plus filtering in one step:
+2. If you want a direct browser collector fallback for Bing:
 
 ```bash
-python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-root ~/.openclaw/workspace-leadgen --collect-bing
+python3 ~/.openclaw/skills/openclaw-leadgen/scripts/collect_bing_results.py --workspace-root ~/.openclaw/workspace/leadgen
 ```
 
-3. If you want the `leadgen` subagent itself to collect data with the local browser, run:
+3. Or run Bing collection plus filtering in one step:
 
 ```bash
-python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-root ~/.openclaw/workspace-leadgen --collect-via-agent
+python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-root ~/.openclaw/workspace/leadgen --collect-bing
+```
+
+4. If you want the `leadgen` subagent itself to collect data with the local browser, run:
+
+```bash
+python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-root ~/.openclaw/workspace/leadgen --collect-via-agent
 ```
 
 `--collect-via-agent` sends one query at a time to the `leadgen` subagent and asks it to use the OpenClaw `browser` tool in a more human-like session flow.
@@ -74,16 +81,16 @@ python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-
 You can override the subagent search engine explicitly:
 
 ```bash
-python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-root ~/.openclaw/workspace-leadgen --collect-via-agent --collector-search-engine google
+python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-root ~/.openclaw/workspace/leadgen --collect-via-agent --collector-search-engine google
 ```
 
-4. If you already have raw search results, save them to `input/search_results.jsonl` inside the leadgen agent workspace and run:
+5. If you already have raw search results, save them to `input/search_results.jsonl` inside the leadgen agent workspace and run:
 
 ```bash
-python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-root ~/.openclaw/workspace-leadgen
+python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-root ~/.openclaw/workspace/leadgen
 ```
 
-5. Review outputs in `out/`:
+6. Review outputs in `out/`:
    - `latest_leads.csv`
    - `latest_leads.jsonl`
    - `latest_summary.md`

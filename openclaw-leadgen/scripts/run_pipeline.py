@@ -46,7 +46,7 @@ def main() -> None:
     parser.add_argument("--collector-session-id", default="leadgen-collector")
     parser.add_argument("--collector-thinking", default="medium")
     parser.add_argument("--collector-timeout-seconds", type=int)
-    parser.add_argument("--collector-search-engine", default="bing")
+    parser.add_argument("--collector-search-engine", default="google")
     parser.add_argument("--search-language", default="en-US")
     parser.add_argument("--search-country", default="us")
     parser.add_argument("--search-timeout-ms", type=int, default=20000)

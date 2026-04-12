@@ -7,7 +7,7 @@ SKILL_SRC="$SRC_DIR/openclaw-leadgen"
 
 OPENCLAW_HOME="${OPENCLAW_HOME:-$HOME/.openclaw}"
 SKILLS_DIR="${OPENCLAW_SKILLS_DIR:-$OPENCLAW_HOME/skills}"
-WORKSPACE_ROOT="${LEADGEN_WORKSPACE:-$OPENCLAW_HOME/workspace-leadgen}"
+WORKSPACE_ROOT="${LEADGEN_WORKSPACE:-$OPENCLAW_HOME/workspace/leadgen}"
 SKILL_DST="$SKILLS_DIR/openclaw-leadgen"
 
 mkdir -p "$SKILL_DST"
@@ -17,7 +17,7 @@ python3 "$SKILL_DST/scripts/bootstrap_workspace.py" --workspace-root "$WORKSPACE
 
 if [ -x /usr/bin/google-chrome ]; then
   echo "Detected Chrome: $(/usr/bin/google-chrome --version 2>/dev/null || echo /usr/bin/google-chrome)"
-  echo "Preferred search path: browser automation against Bing"
+  echo "Preferred search path: main agent -> leadgen subagent -> browser -> Google"
 fi
 
 if [ -d "$OPENCLAW_HOME/workspace/skills/tavily-search" ]; then

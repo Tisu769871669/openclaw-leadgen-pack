@@ -18,15 +18,17 @@ python scripts/bootstrap_workspace.py --workspace-root <agent-workspace>
 
 This creates `config/`, `input/`, and `out/`, then copies the default query and filter files into `config/`.
 
-3. Collect local Bing search results into `input/search_results.jsonl`.
+3. Collect local search results into `input/search_results.jsonl`.
 
-Prefer the bundled collector:
+Preferred production flow:
 
 ```bash
-python scripts/collect_bing_results.py --workspace-root <agent-workspace>
+python scripts/run_pipeline.py --workspace-root <agent-workspace> --collect-via-agent --collector-search-engine google
 ```
 
-Or run the full pipeline in one step:
+This uses the `leadgen` subagent plus the OpenClaw `browser` tool and currently matches the validated Tokyo-server setup.
+
+Optional Bing fallback:
 
 ```bash
 python scripts/run_pipeline.py --workspace-root <agent-workspace> --collect-bing
@@ -54,7 +56,7 @@ If you need to inject your own search results, each JSONL row should contain:
 
 Required keys are `query`, `title`, `url`, and `snippet`. Optional keys are `source`, `position`, and `collected_at`.
 
-When Chrome is available on the target machine, prefer browser automation against Bing over Tavily-based search.
+When Chrome is available on the target machine, prefer browser automation against Google over Tavily-based search.
 
 4. Run the pipeline:
 
@@ -72,8 +74,8 @@ python scripts/run_pipeline.py --workspace-root <agent-workspace>
 ## Collection Rules
 
 - Use the seeded searches from `config/queries.txt` unless the user asks for a different market.
-- Prefer the local browser path on the machine that runs the agent. Use Tavily only if the user explicitly asks for it.
-- Prefer organic Bing results. Do not include forums, social feeds, or marketplaces unless the user explicitly wants them.
+- Prefer the `main -> leadgen -> browser -> Google` path on the machine that runs the agent. Use Tavily only if the user explicitly asks for it.
+- Prefer organic Google results in the main production flow. Keep Bing only as a fallback path.
 - Preserve the search snippet as `snippet`. Do not fetch or scrape full pages before ranking unless the user asks for deeper enrichment.
 - Keep one row per search result. Do not merge results from multiple queries before writing JSONL.
 - When you adjust targeting, edit the workspace copy in `config/`, not the bundled assets, unless you are intentionally changing the defaults for every future run.
@@ -90,7 +92,7 @@ Score and filter raw Google/browser search results into lead candidates. This is
 
 ### `scripts/collect_bing_results.py`
 
-Use the local OpenClaw browser and Chrome to run Bing searches from `config/queries.txt`, then write normalized raw results to `input/search_results.jsonl`.
+Use the local OpenClaw browser and Chrome to run Bing searches from `config/queries.txt`, then write normalized raw results to `input/search_results.jsonl`. Treat this as a fallback collector rather than the primary path.
 
 ### `scripts/collect_via_agent.py`
 

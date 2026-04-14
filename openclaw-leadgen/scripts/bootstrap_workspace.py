@@ -9,6 +9,8 @@ DEFAULT_ASSETS = (
     "include_keywords.txt",
     "exclude_keywords.txt",
     "blocked_domains.txt",
+    "trade_config.yaml",
+    "strategy_log.md",
 )
 
 
@@ -30,9 +32,12 @@ def main() -> None:
     config_dir = workspace_root / "config"
     input_dir = workspace_root / "input"
     out_dir = workspace_root / "out"
+    results_dir = workspace_root / "results"
+    logs_dir = workspace_root / "logs"
+    scripts_dir = workspace_root / "scripts"
     assets_dir = skill_dir / "assets"
 
-    for path in (workspace_root, config_dir, input_dir, out_dir):
+    for path in (workspace_root, config_dir, input_dir, out_dir, results_dir, logs_dir, scripts_dir):
         path.mkdir(parents=True, exist_ok=True)
 
     for name in DEFAULT_ASSETS:
@@ -45,6 +50,8 @@ def main() -> None:
     print(f"CONFIG {config_dir}")
     print(f"INPUT {input_dir}")
     print(f"OUT {out_dir}")
+    print(f"RESULTS {results_dir}")
+    print(f"LOGS {logs_dir}")
 
 
 if __name__ == "__main__":

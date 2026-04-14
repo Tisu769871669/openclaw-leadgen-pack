@@ -1,0 +1,31 @@
+product_category: luxury watches
+product_synonyms:
+  - swiss watches
+  - rolex
+  - omega
+  - longines
+
+target_countries:
+  - Vietnam
+  - Russia
+  - United States
+
+customer_types:
+  - wholesaler
+  - distributor
+  - importer
+  - grey-market dealer
+
+search_criteria:
+  keywords_exclude:
+    - official boutique
+    - authorized dealer
+    - certified pre-owned
+  exclude_domains:
+    - rolex.com
+    - omegawatches.com
+    - longines.com
+
+search_channels:
+  google_browser: true
+  direct_site_validation: true

@@ -18,6 +18,8 @@ python scripts/bootstrap_workspace.py --workspace-root <agent-workspace>
 
 This creates `config/`, `input/`, and `out/`, then copies the default query and filter files into `config/`.
 
+It also creates `results/`, `logs/`, and `scripts/` so the workspace can support browser-only daily runs.
+
 3. Collect local search results into `input/search_results.jsonl`.
 
 Preferred production flow:
@@ -71,6 +73,14 @@ python scripts/run_pipeline.py --workspace-root <agent-workspace>
 - `contact_ready_top20_latest.csv`
 - `contact_ready_top20_latest.md`
 
+If you want the browser-only daily wrapper, run:
+
+```bash
+python scripts/watch_search.py --workspace-root <agent-workspace> --collector-search-engine google --max-queries 3
+```
+
+That wrapper keeps the same collection/filtering logic but also writes dated files into `results/` and `logs/`.
+
 ## Collection Rules
 
 - Use the seeded searches from `config/queries.txt` unless the user asks for a different market.
@@ -98,6 +108,14 @@ Use the local OpenClaw browser and Chrome to run Bing searches from `config/quer
 
 Send a collection task to a dedicated subagent such as `leadgen`, wait for it to write `input/search_results.jsonl`, then continue the pipeline locally.
 
+### `scripts/watch_search.py`
+
+Run the browser-only workflow in a dated-results mode and emit `results/` plus `logs/` artifacts.
+
+### `scripts/check_status.py`
+
+Read the latest `logs/` and `results/` artifacts so an agent can quickly report current state.
+
 ### `scripts/postprocess_contact_top20.py`
 
 Apply contact-signal filtering and root-domain deduplication to produce a contact-ready shortlist.
@@ -113,6 +131,8 @@ Default seeds and filter lists:
 - `include_keywords.txt`
 - `exclude_keywords.txt`
 - `blocked_domains.txt`
+- `trade_config.yaml`
+- `strategy_log.md`
 
 ## Reporting Back
 

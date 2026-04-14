@@ -9,6 +9,8 @@ This directory now contains the refactored leadgen workflow as an OpenClaw skill
   - `prompts/leadgen-subagent-browser-prompt.md`: reusable prompt template sent to the `leadgen` subagent
   - `prompts/main-agent-auto-leadgen.md`: orchestration prompt used by the `main` agent to control `leadgen`
   - `scripts/bootstrap_workspace.py`: create `config/`, `input/`, and `out/`
+  - `scripts/watch_search.py`: browser-only daily search wrapper that writes `results/` and `logs/`
+  - `scripts/check_status.py`: inspect latest status and result artifacts
   - `scripts/collect_bing_results.py`: optional browser collector for Bing fallback
   - `scripts/filter_search_results.py`: score and filter raw local browser search results
   - `scripts/postprocess_contact_top20.py`: contact-signal filter plus root-domain dedup
@@ -31,7 +33,7 @@ bash ./install_skill_on_server.sh leadgen
 The install script:
 
 - copies `openclaw-leadgen/` into `~/.openclaw/skills/openclaw-leadgen`
-- bootstraps the workspace with `config/`, `input/`, and `out/`
+- bootstraps the workspace with `config/`, `input/`, `out/`, `results/`, and `logs/`
 - tries to create an isolated OpenClaw agent with the provided name
 
 ## Tokyo server note
@@ -97,6 +99,21 @@ python3 ~/.openclaw/skills/openclaw-leadgen/scripts/run_pipeline.py --workspace-
    - `contact_ready_top20_latest.csv`
    - `contact_ready_top20_latest.md`
    - `bing-debug/` when Bing extraction returns zero results
+
+## Browser-only daily wrapper
+
+If you want a workflow closer to the colleague browser-only scheme, run:
+
+```bash
+python3 ~/.openclaw/skills/openclaw-leadgen/scripts/watch_search.py --workspace-root ~/.openclaw/workspace/leadgen --collector-search-engine google --max-queries 3
+```
+
+This writes:
+
+- `results/YYYY-MM-DD_watch-leads.csv`
+- `results/YYYY-MM-DD_watch-leads_report.md`
+- `logs/YYYY-MM-DD_status.json`
+- `logs/YYYY-MM-DD_search_log.json`
 
 ## Input schema
 
